@@ -8,7 +8,7 @@
   // Verificar que estamos en Gemini
   if (!window.location.hostname.includes('gemini.google.com')) return;
 
-  const { deepQuerySelector } = window.ZettaShadowWalker;
+  const { deepQuerySelector, deepQuerySelectorAll } = window.ZettaShadowWalker;
 
   class GeminiAdapter extends window.ZettaLLMAdapter {
     constructor() {
@@ -29,11 +29,11 @@
      */
     isGenerationComplete() {
       // Botón de "Stop" activo = aún generando
-      const stopBtn = document.querySelector('button[aria-label*="Stop"], button.stop-button');
+      const stopBtn = deepQuerySelector('button[aria-label*="Stop"], button.stop-button');
       if (stopBtn && !stopBtn.disabled) return false;
 
       // Verificar que haya al menos una respuesta completa renderizada
-      const responses = document.querySelectorAll(
+      const responses = deepQuerySelectorAll(
         'model-response, .response-container, [data-response-index], message-content'
       );
       
@@ -41,7 +41,7 @@
 
       // La última respuesta debe tener el bloque de acciones (copy, like, etc.)
       const lastResponse = responses[responses.length - 1];
-      const actions = lastResponse.querySelector('.response-actions, [aria-label*="Copy"], .trailing-actions');
+      const actions = deepQuerySelector('.response-actions, [aria-label*="Copy"], .trailing-actions', lastResponse);
       return !!actions;
     }
 
@@ -59,7 +59,7 @@
       ];
 
       for (const sel of selectors) {
-        const elements = document.querySelectorAll(sel);
+        const elements = deepQuerySelectorAll(sel);
         if (elements.length > 0) {
           // Tomar los últimos elementos (la respuesta más reciente)
           const lastSet = Array.from(elements).slice(-20);
