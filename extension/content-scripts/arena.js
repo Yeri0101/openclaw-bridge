@@ -31,6 +31,9 @@
       if (this.variant === 'default') return;
 
       const targetLabel = this.variant;
+      // Normalizar: quitar guiones, espacios, etc para hacer un match más flexible
+      const normalize = (str) => str ? str.toLowerCase().replace(/[-_ .]/g, '') : '';
+      const normTarget = normalize(targetLabel);
 
       // 1. Encontrar el botón que abre el selector de modelos
       const pickerBtn = deepQuerySelector('button[aria-haspopup="dialog"], button[aria-controls^="radix-"]');
@@ -43,8 +46,8 @@
       const currentSpan = pickerBtn.querySelector('span.truncate, span');
       const currentText = currentSpan ? currentSpan.innerText.trim() : pickerBtn.innerText.trim();
       
-      if (currentText.toLowerCase().includes(targetLabel.toLowerCase())) {
-        console.log(`[ZettaCore][arena] ✅ Ya en modelo "${targetLabel}", sin cambio.`);
+      if (normalize(currentText).includes(normTarget)) {
+        console.log(`[ZettaCore][arena] ✅ Ya en modelo "${currentText}", sin cambio.`);
         return;
       }
 
@@ -61,19 +64,25 @@
 
       while (!option && Date.now() < deadline) {
         await randomDelay(200, 200);
-        // Buscar el menú (usualmente se renderiza al final del body en un div de radix)
-        const dialog = deepQuerySelector('[role="dialog"], [id^="radix-"]');
-        if (!dialog) continue;
+        // Buscar el menú (usualmente se renderiza al final del body en un div de radix o similar)
+        const dialogs = deepQuerySelectorAll('[role="dialog"], [id^="radix-"], .cmdk-list');
+        
+        // Juntar todas las opciones
+        const options = [];
+        for (const dialog of dialogs) {
+          dialog.querySelectorAll('[role="option"], button, li, .cmdk-item').forEach(el => options.push(el));
+        }
 
-        // Buscar opciones dentro del dialog
-        const options = dialog.querySelectorAll('[role="option"], button, li');
-        option = Array.from(options).find(el => 
-          el.innerText?.trim().toLowerCase().includes(targetLabel.toLowerCase())
-        );
+        // Si no encontró dialogs, buscar directamente en el document (a veces está en un portal genérico)
+        if (options.length === 0) {
+           document.querySelectorAll('[role="option"], .cmdk-item').forEach(el => options.push(el));
+        }
+
+        option = options.find(el => normalize(el.innerText || el.textContent).includes(normTarget));
       }
 
       if (option) {
-        console.log(`[ZettaCore][arena] 🎯 Modelo "${targetLabel}" encontrado. Haciendo clic...`);
+        console.log(`[ZettaCore][arena] 🎯 Modelo "${targetLabel}" encontrado en la lista. Haciendo clic...`);
         await humanClick(option);
         await randomDelay(400, 700);
       } else {
