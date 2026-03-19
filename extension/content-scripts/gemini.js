@@ -14,13 +14,16 @@
     constructor() {
       super({
         platform: 'gemini',
-        // Gemini usa un rich-textarea dentro de un Shadow DOM
         inputSelector: 'rich-textarea div[contenteditable="true"]',
         submitSelector: 'button.send-button, button[aria-label*="Send"], button[aria-label*="Enviar"]',
-        responseSelector: null, // Manejado en extractResponse() con lógica custom
-        maxWaitMs: 180000, // 3 minutos para respuestas largas
+        responseSelector: null,
+        maxWaitMs: 180000,
         pollInterval: 600,
       });
+
+      // Diagnóstico: verificar selector del campo de texto en el DOM
+      const inputCheck = deepQuerySelector('rich-textarea div[contenteditable="true"]');
+      console.log('[ZettaCore][gemini] 🔍 Campo de input encontrado:', !!inputCheck, inputCheck);
     }
 
     /**
@@ -28,20 +31,18 @@
      * Señales de "terminado": el botón "Stop" desaparece y aparece el botón de regenerar.
      */
     isGenerationComplete() {
-      // Botón de "Stop" activo = aún generando
       const stopBtn = deepQuerySelector('button[aria-label*="Stop"], button.stop-button');
-      if (stopBtn && !stopBtn.disabled) return false;
-
-      // Verificar que haya al menos una respuesta completa renderizada
       const responses = deepQuerySelectorAll(
         'model-response, .response-container, [data-response-index], message-content'
       );
-      
+      console.log('[ZettaCore][gemini] 🔁 Polling — stopBtn:', !!stopBtn, '| responses:', responses.length);
+
+      if (stopBtn && !stopBtn.disabled) return false;
       if (responses.length === 0) return false;
 
-      // La última respuesta debe tener el bloque de acciones (copy, like, etc.)
       const lastResponse = responses[responses.length - 1];
       const actions = deepQuerySelector('.response-actions, [aria-label*="Copy"], .trailing-actions', lastResponse);
+      console.log('[ZettaCore][gemini] ❓ actions found:', !!actions);
       return !!actions;
     }
 

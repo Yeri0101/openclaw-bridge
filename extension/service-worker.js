@@ -80,47 +80,73 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Handle commands from the Bridge Server
 async function handleServerMessage(message) {
-  console.log("Mensaje recibido del servidor:", message);
+  console.log("Mensaje recibido del servidor:", message.type);
   
   if (message.type === "generate") {
     const { platform, prompt, requestId } = message;
     
-    // 1. Encuentra o abre la pestaña adecuada
-    let url = "";
-    if (platform === "chatgpt") url = "https://chatgpt.com/";
-    else if (platform === "gemini") url = "https://gemini.google.com/app";
-    else if (platform === "qwen") url = "https://chat.qwenlm.ai/";
-    else {
+    // 1. Determinar el dominio de la plataforma
+    const platformDomains = {
+      chatgpt: "chatgpt.com",
+      gemini: "gemini.google.com",
+      qwen: "chat.qwenlm.ai",
+    };
+    const platformUrls = {
+      chatgpt: "https://chatgpt.com/",
+      gemini: "https://gemini.google.com/app",
+      qwen: "https://chat.qwenlm.ai/",
+    };
+
+    const domain = platformDomains[platform];
+    const targetUrl = platformUrls[platform];
+    
+    if (!domain) {
       ws.send(JSON.stringify({ type: "error", requestId, message: "Plataforma no soportada" }));
       return;
     }
 
-    // Buscar si ya hay una pestaña abierta de esta plataforma
-    const tabs = await chrome.tabs.query({ url: url + "*" });
-    let tabId;
+    // 2. Buscar tab activo por dominio (más robusto que por URL exacta)
+    let tabId = null;
+    const allTabs = await chrome.tabs.query({});
+    const matchingTab = allTabs.find(t => t.url && t.url.includes(domain));
     
-    if (tabs.length > 0) {
-      tabId = tabs[0].id;
-      // Refrescar o asegurar que está activa (depende de la estrategia)
+    console.log(`🔍 Buscando tab de ${domain} entre ${allTabs.length} tabs...`);
+    
+    if (matchingTab) {
+      tabId = matchingTab.id;
+      console.log(`✅ Tab encontrado: ID=${tabId}, URL=${matchingTab.url}`);
       await chrome.tabs.update(tabId, { active: true });
+      // Dar tiempo para que el content script esté listo si el tab estaba en background
+      await new Promise(r => setTimeout(r, 500));
     } else {
-      const newTab = await chrome.tabs.create({ url, active: true });
+      console.log(`📂 No hay tab de ${domain}, creando uno nuevo...`);
+      const newTab = await chrome.tabs.create({ url: targetUrl, active: true });
       tabId = newTab.id;
-      // Esperar un poco a que cargue
-      await new Promise(r => setTimeout(r, 3000));
+      // Esperar a que cargue la página y los content scripts
+      await new Promise(r => setTimeout(r, 5000));
     }
 
-    // 2. Enviar el prompt al content script de la pestaña
-    console.log("Enviando comando al content script del Tab:", tabId);
+    // 3. Enviar el prompt al content script con manejo de errores robusto
+    console.log(`📤 Enviando inject_prompt al tab ${tabId}...`);
     try {
-      // Necesitamos esperar a que el content script inyecte su listener
-      chrome.tabs.sendMessage(tabId, { 
+      await chrome.tabs.sendMessage(tabId, { 
         action: "inject_prompt", 
         prompt: prompt,
         requestId: requestId
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("❌ Error sendMessage:", chrome.runtime.lastError.message);
+          ws.send(JSON.stringify({ 
+            type: "error", 
+            requestId, 
+            message: `Error comunicando con content script: ${chrome.runtime.lastError.message}` 
+          }));
+        } else {
+          console.log("✅ inject_prompt aceptado por content script:", response);
+        }
       });
     } catch(e) {
-      console.error("Error enviando mensaje al tab", e);
+      console.error("❌ Excepción enviando mensaje al tab:", e.message);
       ws.send(JSON.stringify({ type: "error", requestId, message: e.message }));
     }
   }
