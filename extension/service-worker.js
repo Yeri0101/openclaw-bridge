@@ -83,7 +83,7 @@ async function handleServerMessage(message) {
   console.log("Mensaje recibido del servidor:", message.type);
   
   if (message.type === "generate") {
-    const { platform, prompt, requestId } = message;
+    const { platform, variant, prompt, requestId } = message;
     
     // 1. Determinar el dominio de la plataforma
     const platformDomains = {
@@ -133,7 +133,8 @@ async function handleServerMessage(message) {
       chrome.tabs.sendMessage(tabId, { 
         action: "inject_prompt", 
         prompt: prompt,
-        requestId: requestId
+        requestId: requestId,
+        variant: variant
       }, (response) => {
         const err = chrome.runtime.lastError;
         if (err) {
