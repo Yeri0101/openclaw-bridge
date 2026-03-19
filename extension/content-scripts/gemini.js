@@ -53,23 +53,27 @@
 
       console.log(`[ZettaCore][gemini] 🔄 Cambiando de "${currentText}" a "${targetLabel}"...`);
       await humanClick(pillBtn);
-      await randomDelay(500, 900);
 
-      // Esperar a que aparezca el menú desplegable
-      // El menú suele renderizarse en un overlay con opciones tipo mat-option o botones con el texto del modo
-      const menuSelectors = [
-        `mat-option`,
-        `.model-picker-option`,
-        `[role="option"]`,
-        `[role="menuitem"]`,
-        `.mat-mdc-option`,
+      // Esperar activamente a que aparezcan las opciones del menú (hasta 3s)
+      const menuOptionSelectors = [
+        'mat-option', '.mat-mdc-option', '[role="option"]', '[role="menuitem"]', '.model-picker-option',
       ];
 
       let option = null;
-      for (const sel of menuSelectors) {
-        const candidates = deepQuerySelectorAll(sel);
-        option = candidates.find(el => el.innerText?.trim().toLowerCase().includes(targetLabel.toLowerCase()));
-        if (option) break;
+      const deadline = Date.now() + 3000;
+
+      while (!option && Date.now() < deadline) {
+        await randomDelay(200, 200);
+        for (const sel of menuOptionSelectors) {
+          // Buscar tanto en shadow DOM como directamente en document.body
+          const fromShadow = deepQuerySelectorAll(sel);
+          const fromBody = Array.from(document.querySelectorAll(sel));
+          const candidates = [...new Set([...fromShadow, ...fromBody])];
+          option = candidates.find(el =>
+            el.innerText?.trim().toLowerCase().includes(targetLabel.toLowerCase())
+          );
+          if (option) break;
+        }
       }
 
       if (option) {
@@ -77,8 +81,8 @@
         await humanClick(option);
         await randomDelay(400, 700);
       } else {
-        console.warn(`[ZettaCore][gemini] ⚠️ No se encontró la opción "${targetLabel}" en el menú.`);
-        // Cerrar el menú pulsando Escape
+        console.warn(`[ZettaCore][gemini] ⚠️ No se encontró la opción "${targetLabel}" en el menú después de 3s.`);
+        // Cerrar el menú
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       }
     }
