@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ZettaCore Bridge</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      width: 250px;
+      background-color: #f9fafb;
+      color: #111827;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    .header {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .status {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    /* Toggle switch styles */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 28px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #cbd5e1;
+      transition: .3s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    input:checked + .slider {
+      background-color: #10b981; /* Emerald 500 */
+    }
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">ZettaCore Bridge</div>
+  <div class="status" id="status-text">Apagado</div>
+  
+  <label class="switch">
+    <input type="checkbox" id="power-toggle">
+    <span class="slider"></span>
+  </label>
+
+  <script src="popup.js"></script>
+</body>
+</html>

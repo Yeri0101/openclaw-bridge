@@ -100,6 +100,8 @@
     element.focus();
     await randomDelay(150, 300);
 
+    const isContentEditable = element.isContentEditable || element.getAttribute('contenteditable') === 'true';
+
     for (const char of text) {
       // Simular movimiento de ratón ocasional (como lo haría un humano)
       if (Math.random() < 0.05) {
@@ -122,6 +124,16 @@
         bubbles: true,
         cancelable: true,
       }));
+      
+      // INSERTAR EL CARACTER REAL (necesario ya que KeyboardEvent no inserta texto)
+      if (isContentEditable) {
+        document.execCommand('insertText', false, char);
+      } else {
+        element.value += char;
+        // Lanzamos evento input para que frameworks como React deteten el cambio
+        element.dispatchEvent(new window.Event('input', { bubbles: true, cancelable: true }));
+      }
+
       await randomDelay(5, 15);
       element.dispatchEvent(new KeyboardEvent('keyup', {
         key: char,

@@ -108,6 +108,10 @@ async def ws_server_handler(websocket, path=None):
             try:
                 data = json.loads(raw_message)
                 msg_type = data.get("type")
+                
+                if msg_type == "ping":
+                    continue  # Ignorar pings de forma silenciosa (keep-alive)
+
                 log.info(f"← Recibido de extensión: type={msg_type}")
 
                 if msg_type == "register":
