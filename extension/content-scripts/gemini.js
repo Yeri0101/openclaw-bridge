@@ -56,7 +56,9 @@
 
       // Esperar activamente a que aparezcan las opciones del menú (hasta 3s)
       const menuOptionSelectors = [
-        'mat-option', '.mat-mdc-option', '[role="option"]', '[role="menuitem"]', '.model-picker-option',
+        'mat-option', '.mat-mdc-option', '[role="option"]', '[role="menuitem"]', 
+        '.model-picker-option', 'mat-list-item', 'span.gds-body-m', '.gds-body-m',
+        '[data-test-id*="model-"]'
       ];
 
       let option = null;
