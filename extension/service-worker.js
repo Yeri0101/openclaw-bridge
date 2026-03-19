@@ -90,11 +90,13 @@ async function handleServerMessage(message) {
       chatgpt: "chatgpt.com",
       gemini: "gemini.google.com",
       qwen: "chat.qwenlm.ai",
+      arena: "arena.ai",
     };
     const platformUrls = {
       chatgpt: "https://chatgpt.com/",
       gemini: "https://gemini.google.com/app",
       qwen: "https://chat.qwenlm.ai/",
+      arena: "https://arena.ai/text/direct",
     };
 
     const domain = platformDomains[platform];
@@ -142,7 +144,10 @@ async function handleServerMessage(message) {
               ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/gemini.js"]
               : platform === "chatgpt"
               ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/chatgpt.js"]
+              : platform === "arena"
+              ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/arena.js"]
               : ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/qwen.js"];
+
 
             chrome.scripting.executeScript(
               { target: { tabId }, files: scripts },

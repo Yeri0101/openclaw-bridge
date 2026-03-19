@@ -53,6 +53,18 @@ MODEL_PLATFORM_MAP = {
     "qwen2-web":            ("qwen", "default"),
 }
 
+def get_platform_and_variant(model_name: str):
+    # Buscar en el mapa estático primero
+    if model_name in MODEL_PLATFORM_MAP:
+        return MODEL_PLATFORM_MAP[model_name]
+    
+    # Soporte dinámico para modelos de arena.ai (ej. arena-claude-3-opus)
+    if model_name.startswith("arena-"):
+        variant = model_name[6:] # quitar "arena-"
+        return ("arena", variant)
+        
+    return None
+
 BRIDGE_WS_PORT = 8765
 BRIDGE_HTTP_PORT = 8000
 REQUEST_TIMEOUT = 180  # segundos
@@ -216,11 +228,11 @@ async def chat_completions(request: ChatCompletionRequest):
     la envía a Chrome vía WebSocket y espera la respuesta.
     """
     # 1. Validar modelo
-    model_info = MODEL_PLATFORM_MAP.get(request.model)
+    model_info = get_platform_and_variant(request.model)
     if not model_info:
         raise HTTPException(
             status_code=400,
-            detail=f"Modelo '{request.model}' no soportado. Modelos disponibles: {list(MODEL_PLATFORM_MAP.keys())}"
+            detail=f"Modelo '{request.model}' no soportado. Prefijos admitidos: arena-*, gemini*, chatgpt*, qwen*"
         )
     platform, variant = model_info
 

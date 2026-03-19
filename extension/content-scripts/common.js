@@ -189,10 +189,14 @@
         return;
       }
 
-      // Para Gemini: crear instancia con la variante del modelo si se especificó
+      // Para Gemini y Arena: crear instancia con la variante del modelo si se especificó
       let adapter = window.ZettaActiveAdapter;
-      if (variant && window.ZettaGeminiAdapterClass && adapter instanceof window.ZettaGeminiAdapterClass) {
-        adapter = new window.ZettaGeminiAdapterClass(variant);
+      if (variant) {
+        if (window.ZettaGeminiAdapterClass && adapter instanceof window.ZettaGeminiAdapterClass) {
+          adapter = new window.ZettaGeminiAdapterClass(variant);
+        } else if (window.ZettaArenaAdapterClass && adapter instanceof window.ZettaArenaAdapterClass) {
+          adapter = new window.ZettaArenaAdapterClass(variant);
+        }
       }
 
       // Ejecutar de forma asíncrona (no bloquear el listener)
