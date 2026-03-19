@@ -101,12 +101,22 @@
 
       if (option) {
         console.log(`[ZettaCore][arena] 🎯 Modelo "${targetLabel}" encontrado en la lista. Haciendo clic...`);
-        // Usamos click() nativo directamente: Radix UI llama a setPointerCapture()
-        // en su handler onPointerDown, lo que falla con PointerEvents sintéticos.
-        option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-        option.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true }));
+        // Radix UI ignora MouseEvents y falla con PointerEvents sintéticos (setPointerCapture).
+        // Enfocamos el ítem y enviamos Enter, que Radix siempre atiende vía onKeyDown.
+        option.focus();
+        await randomDelay(80, 150);
+        option.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Enter', code: 'Enter', keyCode: 13,
+          bubbles: true, cancelable: true, view: window
+        }));
+        option.dispatchEvent(new KeyboardEvent('keyup', {
+          key: 'Enter', code: 'Enter', keyCode: 13,
+          bubbles: true, cancelable: true, view: window
+        }));
+        // Fallback: click nativo en caso de que enter no sea suficiente
         option.click();
-        await randomDelay(400, 700);
+        await randomDelay(500, 800);
+
       } else {
         console.warn(`[ZettaCore][arena] ⚠️ No se encontró el modelo "${targetLabel}" en la lista después de 3s.`);
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
