@@ -105,58 +105,114 @@
   }
 
   /**
-   * Escribe texto carácter a carácter con delay humano variable.
+   * Escribe texto carácter a carácter con comportamiento humano avanzado:
+   * - Velocidad variable con efecto "racha" (se acelera al coger ritmo)
+   * - Erratas aleatorias con corrección inmediata (Backspace)
+   * - Pausas largas de "pensamiento" en puntos naturales (espacios, comas)
+   * - Micro-movimientos del ratón ocasionales
    * @param {Element} element - Elemento de input/contenteditable
    * @param {string} text - Texto a escribir
    */
   async function humanType(element, text) {
     element.focus();
-    await randomDelay(150, 300);
+    await randomDelay(200, 500);
 
     const isContentEditable = element.isContentEditable || element.getAttribute('contenteditable') === 'true';
 
-    for (const char of text) {
-      // Simular movimiento de ratón ocasional (como lo haría un humano)
-      if (Math.random() < 0.05) {
-        await simulateMouseMove(element);
-      }
+    // Caracteres adyacentes en teclado QWERTY para simular erratas realistas
+    const adjacentKeys = {
+      'a': 'sq', 'b': 'vn', 'c': 'xv', 'd': 'sf', 'e': 'wr', 'f': 'dg',
+      'g': 'fh', 'h': 'gj', 'i': 'uo', 'j': 'hk', 'k': 'jl', 'l': 'k',
+      'm': 'n', 'n': 'mb', 'o': 'ip', 'p': 'o', 'q': 'w', 'r': 'et',
+      's': 'ad', 't': 'ry', 'u': 'yi', 'v': 'bc', 'w': 'qe', 'x': 'zc',
+      'y': 'tu', 'z': 'x', ' ': ' ',
+    };
 
-      // Pausa larga ocasional (el humano "piensa")
-      const delay = Math.random() < 0.08
-        ? Math.floor(Math.random() * 400 + 300)  // pausa larga
-        : Math.floor(Math.random() * 80 + 40);   // delay normal
-
-      element.dispatchEvent(new KeyboardEvent('keydown', {
-        key: char,
-        bubbles: true,
-        cancelable: true,
-      }));
-      await randomDelay(5, 15);
-      element.dispatchEvent(new KeyboardEvent('keypress', {
-        key: char,
-        bubbles: true,
-        cancelable: true,
-      }));
-      
-      // INSERTAR EL CARACTER REAL (necesario ya que KeyboardEvent no inserta texto)
+    // Función para escribir un solo carácter real en el DOM
+    const insertChar = (char) => {
       if (isContentEditable) {
         document.execCommand('insertText', false, char);
       } else {
         element.value += char;
-        // Lanzamos evento input para que frameworks como React deteten el cambio
-        element.dispatchEvent(new window.Event('input', { bubbles: true, cancelable: true }));
+        element.dispatchEvent(new window.Event('input', { bubbles: true }));
+      }
+    };
+
+    // Función para borrar el último carácter (Backspace)
+    const pressBackspace = async () => {
+      const bsProps = { key: 'Backspace', code: 'Backspace', bubbles: true, cancelable: true };
+      element.dispatchEvent(new KeyboardEvent('keydown', bsProps));
+      await randomDelay(40, 90);
+      if (isContentEditable) {
+        document.execCommand('delete');
+      } else {
+        element.value = element.value.slice(0, -1);
+        element.dispatchEvent(new window.Event('input', { bubbles: true }));
+      }
+      element.dispatchEvent(new KeyboardEvent('keyup', bsProps));
+      await randomDelay(60, 130);
+    };
+
+    // Función para presionar y escribir un carácter
+    const pressChar = async (char) => {
+      element.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true, cancelable: true }));
+      await randomDelay(5, 18);
+      element.dispatchEvent(new KeyboardEvent('keypress', { key: char, bubbles: true, cancelable: true }));
+      insertChar(char);
+      await randomDelay(5, 18);
+      element.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true, cancelable: true }));
+    };
+
+    let streakSpeed = 0; // Velocidad de racha: aumenta al escribir seguido, decrece en errores
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+
+      // --- Micro-movimiento de ratón ocasional (5% de probabilidad) ---
+      if (Math.random() < 0.05) {
+        await simulateMouseMove(element);
       }
 
-      await randomDelay(5, 15);
-      element.dispatchEvent(new KeyboardEvent('keyup', {
-        key: char,
-        bubbles: true,
-        cancelable: true,
-      }));
+      // --- Pausa de "pensamiento" en puntos naturales ---
+      // En espacios después de coma/punto, o al inicio de oración
+      const isPunctuation = [' ', ',', '.', '!', '?'].includes(char);
+      const isAfterPunctuation = i > 0 && ['.', '!', '?'].includes(text[i - 1]);
+
+      let delay;
+      if (isAfterPunctuation && Math.random() < 0.4) {
+        delay = Math.floor(Math.random() * 600 + 300);  // pausa de pensamiento: 300-900ms
+        streakSpeed = 0;
+      } else if (isPunctuation && Math.random() < 0.2) {
+        delay = Math.floor(Math.random() * 250 + 100);  // pausa media en coma/espacio
+      } else {
+        // Velocidad con "efecto racha": se acelera progresivamente hasta un mínimo
+        const baseDelay = Math.max(30, 120 - streakSpeed * 3);
+        delay = Math.floor(Math.random() * baseDelay + 30);
+        streakSpeed = Math.min(25, streakSpeed + 1);
+      }
+
+      // --- Errata aleatoria (8% de probabilidad), excepto en caracteres especiales ---
+      const lowerChar = char.toLowerCase();
+      const typoChars = adjacentKeys[lowerChar];
+      if (typoChars && Math.random() < 0.08) {
+        // Escribir carácter incorrecto adyacente
+        const wrongChar = typoChars[Math.floor(Math.random() * typoChars.length)];
+        await pressChar(wrongChar);
+        streakSpeed = 0; // El error rompe la racha
+
+        // Pausa de "me di cuenta del error" antes de borrar
+        await randomDelay(80, 250);
+        await pressBackspace();
+        // Ahora escribir el correcto
+        await pressChar(char);
+      } else {
+        await pressChar(char);
+      }
 
       await new Promise(r => setTimeout(r, delay));
     }
   }
+
 
   /**
    * Dispara Ctrl+Enter para enviar el formulario (alternativa a clic en botón).
