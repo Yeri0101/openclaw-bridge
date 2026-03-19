@@ -58,15 +58,28 @@
       clientY: y,
     };
 
+    element.dispatchEvent(new PointerEvent('pointerover', eventProps));
     element.dispatchEvent(new MouseEvent('mouseover', eventProps));
     await randomDelay(30, 80);
+    element.dispatchEvent(new PointerEvent('pointermove', eventProps));
     element.dispatchEvent(new MouseEvent('mousemove', eventProps));
     await randomDelay(20, 50);
+    element.dispatchEvent(new PointerEvent('pointerdown', eventProps));
     element.dispatchEvent(new MouseEvent('mousedown', eventProps));
     await randomDelay(50, 120);
+    element.dispatchEvent(new PointerEvent('pointerup', eventProps));
     element.dispatchEvent(new MouseEvent('mouseup', eventProps));
     await randomDelay(10, 30);
+    element.dispatchEvent(new PointerEvent('click', eventProps));
     element.dispatchEvent(new MouseEvent('click', eventProps));
+    
+    // Fallback nativo: útil cuando las librerías ignoran eventos sintéticos (isTrusted=false)
+    try {
+      element.click();
+    } catch (e) {
+      console.warn('[ZettaCore] element.click() falló', e);
+    }
+
     await randomDelay(40, 100);
   }
 
