@@ -101,7 +101,11 @@
 
       if (option) {
         console.log(`[ZettaCore][arena] 🎯 Modelo "${targetLabel}" encontrado en la lista. Haciendo clic...`);
-        await humanClick(option);
+        // Usamos click() nativo directamente: Radix UI llama a setPointerCapture()
+        // en su handler onPointerDown, lo que falla con PointerEvents sintéticos.
+        option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        option.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true }));
+        option.click();
         await randomDelay(400, 700);
       } else {
         console.warn(`[ZettaCore][arena] ⚠️ No se encontró el modelo "${targetLabel}" en la lista después de 3s.`);
