@@ -101,18 +101,32 @@
      * Detecta si Gemini ha terminado de generar.
      */
     isGenerationComplete() {
-      const stopBtn = deepQuerySelector('button[aria-label*="Stop"], button.stop-button');
-      const responses = deepQuerySelectorAll(
-        'model-response, .response-container, [data-response-index], message-content'
+      // Señal 1: el botón "Stop" desaparece cuando Gemini termina de generar
+      const stopBtn = deepQuerySelector(
+        'button[aria-label*="Stop"], button[aria-label*="Detener"], button.stop-button'
       );
 
-      if (stopBtn && !stopBtn.disabled) return false;
+      // Si el botón Stop está visible y activo → aún generando
+      if (stopBtn && !stopBtn.disabled && stopBtn.offsetParent !== null) return false;
+
+      // Necesitamos al menos una respuesta en el DOM
+      const responses = deepQuerySelectorAll(
+        'model-response, message-content, [data-response-index]'
+      );
       if (responses.length === 0) return false;
 
-      const lastResponse = responses[responses.length - 1];
-      const actions = deepQuerySelector('.response-actions, [aria-label*="Copy"], .trailing-actions', lastResponse);
-      return !!actions;
+      // Señal 2: botón de copiar aparece en cualquier parte del Doc (fuera del model-response)
+      const copyBtn = document.querySelector(
+        'button[aria-label*="Copy"], button[aria-label*="Copiar"], [data-test-id="copy-button"]'
+      );
+      if (copyBtn) return true;
+
+      // Señal 3: si el Stop desapareció completamente y hay respuesta → asumir completo
+      if (!stopBtn && responses.length > 0) return true;
+
+      return false;
     }
+
 
     /**
      * Extrae el texto de la última respuesta de Gemini.
