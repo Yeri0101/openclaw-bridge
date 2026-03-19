@@ -36,7 +36,13 @@
       const normTarget = normalize(targetLabel);
 
       // 1. Encontrar el botón que abre el selector de modelos
-      const pickerBtn = deepQuerySelector('button[aria-haspopup="dialog"], button[aria-controls^="radix-"]');
+      const allBtns = Array.from(deepQuerySelectorAll('button[aria-haspopup="dialog"], button[aria-controls^="radix-"]'));
+      // Descartar botones de selector de modo ("Direct", "Side-by-side", etc.)
+      const pickerBtn = allBtns.find(b => {
+        const txt = (b.innerText || b.textContent || '').trim().toLowerCase();
+        const isModeSelector = txt === 'direct' || txt.includes('side-by-side') || txt === 'battle';
+        return !isModeSelector && (b.offsetWidth > 0 || b.offsetHeight > 0);
+      });
       if (!pickerBtn) {
         console.warn(`[ZettaCore][arena] ⚠️ No se encontró el botón de selección de modelo.`);
         return;
