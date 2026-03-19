@@ -15,32 +15,53 @@
   }
 
   /**
-   * Simula un movimiento suave del ratón hacia un elemento.
-   * Los movimientos de ratón hacen que el sitio "crea" que hay un humano.
+   * Simula un movimiento suave del ratón con curva tipo Bézier y micro-temblores (jitter).
+   * Los humanos no mueven el ratón en línea recta: van en arco y con pequeños temblores de pulso.
    * @param {Element} element
    */
   async function simulateMouseMove(element) {
     const rect = element.getBoundingClientRect();
-    const targetX = rect.left + rect.width / 2 + (Math.random() * 10 - 5);
-    const targetY = rect.top + rect.height / 2 + (Math.random() * 10 - 5);
 
-    // Simular movimiento en pasos
-    const steps = Math.floor(Math.random() * 3) + 2;
-    for (let i = 0; i < steps; i++) {
-      const progress = (i + 1) / steps;
-      const x = targetX * progress;
-      const y = targetY * progress;
+    // Punto de destino con pequeña variación humana
+    const targetX = rect.left + rect.width / 2 + (Math.random() * 12 - 6);
+    const targetY = rect.top + rect.height / 2 + (Math.random() * 12 - 6);
+
+    // Partir desde una posición "anterior" plausible
+    const startX = targetX + (Math.random() * 200 - 100);
+    const startY = targetY + (Math.random() * 200 - 100);
+
+    // Punto de control para curva Bézier cuadrática (da el arco humano)
+    const cpX = (startX + targetX) / 2 + (Math.random() * 80 - 40);
+    const cpY = (startY + targetY) / 2 + (Math.random() * 80 - 40);
+
+    const steps = Math.floor(Math.random() * 8) + 10; // 10-18 pasos
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      // Curva Bézier cuadrática: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+      const bx = (1 - t) ** 2 * startX + 2 * (1 - t) * t * cpX + t ** 2 * targetX;
+      const by = (1 - t) ** 2 * startY + 2 * (1 - t) * t * cpY + t ** 2 * targetY;
+
+      // Micro-temblor: oscilación de pulso aleatoria (±2px)
+      const jitterX = (Math.random() - 0.5) * 2.5;
+      const jitterY = (Math.random() - 0.5) * 2.5;
+
       element.dispatchEvent(new MouseEvent('mousemove', {
         bubbles: true,
         cancelable: true,
-        clientX: x,
-        clientY: y,
-        movementX: Math.random() * 5,
-        movementY: Math.random() * 5,
+        clientX: bx + jitterX,
+        clientY: by + jitterY,
+        movementX: jitterX,
+        movementY: jitterY,
       }));
-      await randomDelay(10, 30);
+
+      // Velocidad variable: más rápido a mitad del recorrido, más lento al inicio y al final
+      const speed = Math.sin(t * Math.PI); // curva de seno: lento→rápido→lento
+      const stepDelay = Math.floor(10 + (1 - speed) * 25);
+      await new Promise(r => setTimeout(r, stepDelay));
     }
   }
+
 
   /**
    * Clic humano simulado: mouseover → mousemove → mousedown → mouseup → click
