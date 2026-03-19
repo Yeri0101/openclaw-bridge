@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "OpenClaw ZettaCore Bridge",
+  "version": "1.2",
+  "description": "Puente local entre OpenClaw y las interfaces web de LLMs comerciales.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "cookies",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://chat.qwenlm.ai/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": [
+        "content-scripts/shadow-walker.js",
+        "content-scripts/blind-protocol.js",
+        "content-scripts/common.js",
+        "content-scripts/gemini.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": [
+        "content-scripts/shadow-walker.js",
+        "content-scripts/blind-protocol.js",
+        "content-scripts/common.js",
+        "content-scripts/chatgpt.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.qwenlm.ai/*"],
+      "js": [
+        "content-scripts/shadow-walker.js",
+        "content-scripts/blind-protocol.js",
+        "content-scripts/common.js",
+        "content-scripts/qwen.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
