@@ -78,7 +78,19 @@
            document.querySelectorAll('[role="option"], .cmdk-item').forEach(el => options.push(el));
         }
 
-        option = options.find(el => normalize(el.innerText || el.textContent).includes(normTarget));
+        // 1. Priorizar coincidencia exacta
+        option = options.find(el => {
+          const text = el.innerText || el.textContent;
+          return text && normalize(text) === normTarget;
+        });
+
+        // 2. Si no hay exacta, buscar inclusión parcial
+        if (!option) {
+          option = options.find(el => {
+            const text = el.innerText || el.textContent;
+            return text && normalize(text).includes(normTarget);
+          });
+        }
       }
 
       if (option) {
