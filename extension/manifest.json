@@ -14,7 +14,9 @@
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://gemini.google.com/*",
-    "https://chat.qwenlm.ai/*"
+    "https://chat.qwenlm.ai/*",
+    "https://*.arena.ai/*",
+    "https://arena.ai/*"
   ],
   "action": {
     "default_popup": "popup/index.html",
