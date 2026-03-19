@@ -126,29 +126,51 @@ async function handleServerMessage(message) {
       await new Promise(r => setTimeout(r, 5000));
     }
 
-    // 3. Enviar el prompt al content script con manejo de errores robusto
-    console.log(`📤 Enviando inject_prompt al tab ${tabId}...`);
-    try {
-      await chrome.tabs.sendMessage(tabId, { 
+    // 3. Función helper para enviar el prompt al content script
+    const sendPromptToTab = (tabId, retrying = false) => {
+      chrome.tabs.sendMessage(tabId, { 
         action: "inject_prompt", 
         prompt: prompt,
         requestId: requestId
       }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("❌ Error sendMessage:", chrome.runtime.lastError.message);
-          ws.send(JSON.stringify({ 
-            type: "error", 
-            requestId, 
-            message: `Error comunicando con content script: ${chrome.runtime.lastError.message}` 
-          }));
+        const err = chrome.runtime.lastError;
+        if (err) {
+          if (!retrying && err.message.includes("Receiving end does not exist")) {
+            // Content script huérfano — re-inyectar los scripts y reintentar
+            console.warn(`⚠️ Content script huérfano en tab ${tabId}. Re-inyectando scripts...`);
+            const scripts = platform === "gemini"
+              ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/gemini.js"]
+              : platform === "chatgpt"
+              ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/chatgpt.js"]
+              : ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/qwen.js"];
+
+            chrome.scripting.executeScript(
+              { target: { tabId }, files: scripts },
+              () => {
+                if (chrome.runtime.lastError) {
+                  const msg = `No se pudo re-inyectar scripts: ${chrome.runtime.lastError.message}`;
+                  console.error("❌", msg);
+                  ws.send(JSON.stringify({ type: "error", requestId, message: msg }));
+                } else {
+                  console.log("✅ Scripts re-inyectados. Reintentando inject_prompt en 500ms...");
+                  setTimeout(() => sendPromptToTab(tabId, true), 500);
+                }
+              }
+            );
+          } else {
+            const msg = `Error comunicando con content script: ${err.message}`;
+            console.error("❌ Error sendMessage:", msg);
+            ws.send(JSON.stringify({ type: "error", requestId, message: msg }));
+          }
         } else {
           console.log("✅ inject_prompt aceptado por content script:", response);
         }
       });
-    } catch(e) {
-      console.error("❌ Excepción enviando mensaje al tab:", e.message);
-      ws.send(JSON.stringify({ type: "error", requestId, message: e.message }));
-    }
+    };
+
+    console.log(`📤 Enviando inject_prompt al tab ${tabId}...`);
+    sendPromptToTab(tabId);
+
   }
 }
 
