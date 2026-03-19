@@ -174,10 +174,9 @@
   // Cada adaptador se registra a sí mismo con window.ZettaActiveAdapter.
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'inject_prompt') {
-      const { prompt, requestId } = message;
-      console.log(`[ZettaCore] Recibido inject_prompt (id: ${requestId})`);
+      const { prompt, requestId, variant } = message;
+      console.log(`[ZettaCore] Recibido inject_prompt (id: ${requestId}, variant: ${variant || 'default'})`);
 
-      // El adaptador específico de la plataforma debe haberse registrado ya
       if (!window.ZettaActiveAdapter) {
         const errMsg = '[ZettaCore] No hay adaptador activo registrado en esta pestaña.';
         console.error(errMsg);
@@ -190,8 +189,14 @@
         return;
       }
 
+      // Para Gemini: crear instancia con la variante del modelo si se especificó
+      let adapter = window.ZettaActiveAdapter;
+      if (variant && window.ZettaGeminiAdapterClass && adapter instanceof window.ZettaGeminiAdapterClass) {
+        adapter = new window.ZettaGeminiAdapterClass(variant);
+      }
+
       // Ejecutar de forma asíncrona (no bloquear el listener)
-      window.ZettaActiveAdapter.handle(prompt, requestId);
+      adapter.handle(prompt, requestId);
       sendResponse({ status: 'accepted' });
     }
     return true; // Mantener canal abierto para respuesta asíncrona

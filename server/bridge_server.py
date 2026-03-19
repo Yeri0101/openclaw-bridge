@@ -39,11 +39,18 @@ log = logging.getLogger("ZettaBridge")
 # Mapeo de nombres de modelo → plataforma web
 # ─────────────────────────────────────────────────────────────────────────────
 MODEL_PLATFORM_MAP = {
-    "gemini-web": "gemini",
-    "chatgpt-web": "chatgpt",
-    "gpt-web": "chatgpt",
-    "qwen-web": "qwen",
-    "qwen2-web": "qwen",
+    # Gemini — modos
+    "gemini-web":           ("gemini", "fast"),
+    "gemini-fast-web":      ("gemini", "fast"),
+    "gemini-pro-web":       ("gemini", "pro"),
+    "gemini-thinking-web":  ("gemini", "reasoning"),
+    "gemini-reasoning-web": ("gemini", "reasoning"),
+    # ChatGPT
+    "chatgpt-web":          ("chatgpt", "default"),
+    "gpt-web":              ("chatgpt", "default"),
+    # Qwen
+    "qwen-web":             ("qwen", "default"),
+    "qwen2-web":            ("qwen", "default"),
 }
 
 BRIDGE_WS_PORT = 8765
@@ -209,12 +216,13 @@ async def chat_completions(request: ChatCompletionRequest):
     la envía a Chrome vía WebSocket y espera la respuesta.
     """
     # 1. Validar modelo
-    platform = MODEL_PLATFORM_MAP.get(request.model)
-    if not platform:
+    model_info = MODEL_PLATFORM_MAP.get(request.model)
+    if not model_info:
         raise HTTPException(
             status_code=400,
             detail=f"Modelo '{request.model}' no soportado. Modelos disponibles: {list(MODEL_PLATFORM_MAP.keys())}"
         )
+    platform, variant = model_info
 
     # 2. Verificar que la extensión está conectada
     if not manager.is_connected():
@@ -242,6 +250,7 @@ async def chat_completions(request: ChatCompletionRequest):
         await manager.send_to_extension({
             "type": "generate",
             "platform": platform,
+            "variant": variant,
             "prompt": prompt,
             "requestId": request_id,
         })
