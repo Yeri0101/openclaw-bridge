@@ -7,7 +7,7 @@
   'use strict';
 
   const { deepQuerySelector, waitForElement } = window.ZettaShadowWalker;
-  const { wakeUpField, humanType, humanClick, pressCtrlEnter, randomDelay } = window.ZettaBlindProtocol;
+  const { wakeUpField, humanType, humanClick, cdpClick, pressCtrlEnter, randomDelay } = window.ZettaBlindProtocol;
 
   class LLMAdapter {
     constructor(config) {
@@ -98,15 +98,33 @@
     /**
      * Polling: espera hasta que la generación haya terminado.
      */
-    async waitForCompletion() {
+    async waitForCompletion(requestId) {
       const startTime = Date.now();
-      
+      const PROGRESS_EVERY_N_POLLS = 5; // reportar cada ~3s con pollInterval=600ms
+      let pollCount = 0;
+
       // Esperar un poco antes de empezar a hacer polling (para que empiece a generar)
       await new Promise(r => setTimeout(r, 1500));
-      
+
       return new Promise((resolve, reject) => {
         const poll = setInterval(() => {
           try {
+            pollCount++;
+
+            // Reportar progreso parcial cada N polls (no bloquea el flujo)
+            if (pollCount % PROGRESS_EVERY_N_POLLS === 0 && requestId) {
+              try {
+                const partialContent = this.extractResponse();
+                if (partialContent && partialContent.length > 0) {
+                  chrome.runtime.sendMessage({
+                    action: 'stream_progress',
+                    requestId,
+                    content: partialContent,
+                  });
+                }
+              } catch (_) { /* ignorar errores de extracción parcial */ }
+            }
+
             if (this.isGenerationComplete()) {
               clearInterval(poll);
               resolve();
@@ -127,7 +145,7 @@
      * @param {string} prompt
      * @param {string} requestId
      */
-    async handle(prompt, requestId) {
+    async handle(prompt, requestId, settings = {}) {
       console.log(`[ZettaCore][${this.platform}] Iniciando handle() para requestId: ${requestId}`);
       
       try {
@@ -137,7 +155,7 @@
         await this.submitPrompt(inputEl);
         
         console.log(`[ZettaCore][${this.platform}] Prompt enviado, esperando respuesta...`);
-        await this.waitForCompletion();
+        await this.waitForCompletion(requestId);
         
         const responseText = this.extractResponse();
         console.log(`[ZettaCore][${this.platform}] Respuesta extraída (${responseText.length} chars)`);
@@ -174,7 +192,7 @@
   // Cada adaptador se registra a sí mismo con window.ZettaActiveAdapter.
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'inject_prompt') {
-      const { prompt, requestId, variant } = message;
+      const { prompt, requestId, variant, settings } = message;
       console.log(`[ZettaCore] Recibido inject_prompt (id: ${requestId}, variant: ${variant || 'default'})`);
 
       if (!window.ZettaActiveAdapter) {
@@ -194,13 +212,15 @@
       if (variant) {
         if (window.ZettaGeminiAdapterClass && adapter instanceof window.ZettaGeminiAdapterClass) {
           adapter = new window.ZettaGeminiAdapterClass(variant);
+          window.ZettaActiveAdapter = adapter; // actualizar instancia global
         } else if (window.ZettaArenaAdapterClass && adapter instanceof window.ZettaArenaAdapterClass) {
           adapter = new window.ZettaArenaAdapterClass(variant);
+          window.ZettaActiveAdapter = adapter; // actualizar instancia global
         }
       }
 
       // Ejecutar de forma asíncrona (no bloquear el listener)
-      adapter.handle(prompt, requestId);
+      adapter.handle(prompt, requestId, settings || {});
       sendResponse({ status: 'accepted' });
     }
     return true; // Mantener canal abierto para respuesta asíncrona

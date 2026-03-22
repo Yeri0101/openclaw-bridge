@@ -83,7 +83,7 @@ async function handleServerMessage(message) {
   console.log("Mensaje recibido del servidor:", message.type);
   
   if (message.type === "generate") {
-    const { platform, variant, prompt, requestId } = message;
+    const { platform, variant, prompt, requestId, settings } = message;
     
     // 1. Determinar el dominio de la plataforma
     const platformDomains = {
@@ -91,12 +91,14 @@ async function handleServerMessage(message) {
       gemini: "gemini.google.com",
       qwen: "chat.qwenlm.ai",
       arena: "arena.ai",
+      sora: "sora.chatgpt.com",
     };
     const platformUrls = {
       chatgpt: "https://chatgpt.com/",
       gemini: "https://gemini.google.com/app",
       qwen: "https://chat.qwenlm.ai/",
       arena: "https://arena.ai/text/direct",
+      sora: "https://sora.chatgpt.com/drafts",
     };
 
     const domain = platformDomains[platform];
@@ -134,7 +136,8 @@ async function handleServerMessage(message) {
         action: "inject_prompt", 
         prompt: prompt,
         requestId: requestId,
-        variant: variant
+        variant: variant,
+        settings: settings || {}
       }, (response) => {
         const err = chrome.runtime.lastError;
         if (err) {
@@ -147,6 +150,8 @@ async function handleServerMessage(message) {
               ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/chatgpt.js"]
               : platform === "arena"
               ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/arena.js"]
+              : platform === "sora"
+              ? ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/sora.js"]
               : ["content-scripts/shadow-walker.js", "content-scripts/blind-protocol.js", "content-scripts/common.js", "content-scripts/qwen.js"];
 
 
@@ -182,8 +187,9 @@ async function handleServerMessage(message) {
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+
+  // ─── generation_complete: reenviar resultado al Bridge Server ───
   if (request.action === "generation_complete") {
-    // Send standard API response format back to server
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: "response",
@@ -192,8 +198,80 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         platform: request.platform
       }));
     }
+    return true; // async
   }
-  return true; // async
+
+  // ─── cdp_click: clic nativo real via Chrome Debugger Protocol ───
+  if (request.action === "cdp_click") {
+    const tabId = sender.tab && sender.tab.id;
+    if (!tabId) {
+      sendResponse({ success: false, error: "sender.tab.id no disponible" });
+      return true;
+    }
+
+    const { x, y } = request;
+    if (typeof x !== "number" || typeof y !== "number") {
+      sendResponse({ success: false, error: "Coordenadas x/y inválidas" });
+      return true;
+    }
+
+    // Flujo CDP: attach → mouseMoved → mousePressed → mouseReleased → detach
+    (async () => {
+      const target = { tabId };
+      try {
+        await chrome.debugger.attach(target, "1.3");
+      } catch (e) {
+        console.error("❌ CDP attach failed:", e.message);
+        sendResponse({ success: false, error: `attach failed: ${e.message}` });
+        return;
+      }
+
+      try {
+        const baseParams = { x, y, button: "left", clickCount: 1, modifiers: 0 };
+
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          ...baseParams, type: "mouseMoved"
+        });
+        await new Promise(r => setTimeout(r, 30 + Math.random() * 30));
+
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          ...baseParams, type: "mousePressed"
+        });
+        await new Promise(r => setTimeout(r, 60 + Math.random() * 60));
+
+        await chrome.debugger.sendCommand(target, "Input.dispatchMouseEvent", {
+          ...baseParams, type: "mouseReleased"
+        });
+
+        console.log(`✅ CDP click ejecutado en (${Math.round(x)}, ${Math.round(y)}) tab=${tabId}`);
+        sendResponse({ success: true });
+      } catch (e) {
+        console.error("❌ CDP dispatch failed:", e.message);
+        sendResponse({ success: false, error: `dispatch failed: ${e.message}` });
+      } finally {
+        try {
+          await chrome.debugger.detach(target);
+        } catch (e) {
+          console.warn("⚠️ CDP detach warning:", e.message);
+        }
+      }
+    })();
+
+    return true; // keep message channel open for async sendResponse
+  }
+
+  // ─── stream_progress: progreso parcial durante generación ───
+  if (request.action === "stream_progress") {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: "progress",
+        requestId: request.requestId,
+        content: request.content,
+      }));
+    }
+    return false; // fire-and-forget, no sendResponse needed
+  }
+
 });
 
 // Actualiza el texto visual del ícono de la extensión

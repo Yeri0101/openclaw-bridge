@@ -11,12 +11,18 @@
   const { deepQuerySelector, deepQuerySelectorAll, waitForElement } = window.ZettaShadowWalker;
   const { humanClick, randomDelay } = window.ZettaBlindProtocol;
 
-  // Mapa de variante de modelo → texto que aparece en el menú de Gemini
+  // Mapa de variante → lista de labels posibles en el UI de Gemini.
+  // El UI puede estar en español o inglés según la configuración del usuario.
+  // NOMENCLATURA REAL (Gemini 3): Fast | Razonamiento | Pro
   const VARIANT_LABELS = {
-    fast:      'Fast',
-    pro:       'Pro',
-    reasoning: 'Reasoning',
-    flash:     'Flash',  // por si aparece en alguna versión
+    fast:      ['Fast', 'Rápido'],
+    flash:     ['Flash', 'Fast', 'Rápido'],  // Flash = modo Fast en Gemini 3
+    pro:       ['Pro'],
+    reasoning: ['Razonamiento', 'Reasoning', 'Thinking', 'Think'],
+    // Aliases de nombres completos (backward compat)
+    'gemini-2.0-flash': ['Flash', 'Fast', 'Rápido'],
+    'gemini-2.5-pro':   ['Pro'],
+    'gemini-reasoning': ['Razonamiento', 'Reasoning', 'Thinking'],
   };
 
   class GeminiAdapter extends window.ZettaLLMAdapter {
@@ -36,9 +42,11 @@
      * Selecciona el modo de Gemini (Fast / Pro / Reasoning) antes de enviar el prompt.
      */
     async selectMode() {
-      const targetLabel = VARIANT_LABELS[this.variant] || 'Fast';
+      // VARIANT_LABELS ahora es un array de posibles textos
+      const labels = VARIANT_LABELS[this.variant];
+      if (!labels) return; // variante desconocida, no cambiar
 
-      // Leer el modo actual
+      // Leer el modo actual del pill
       const pillBtn = deepQuerySelector('[data-test-id="logo-pill-label-container"]');
       if (!pillBtn) {
         console.warn('[ZettaCore][gemini] ⚠️ No se encontró el selector de modo.');
@@ -46,12 +54,14 @@
       }
 
       const currentText = pillBtn.innerText.trim();
-      if (currentText.toLowerCase().includes(targetLabel.toLowerCase())) {
-        console.log(`[ZettaCore][gemini] ✅ Ya en modo "${targetLabel}", sin cambio.`);
+      // Ya está en el modo correcto si coincide con alguno de los labels
+      const alreadyCorrect = labels.some(l => currentText.toLowerCase().includes(l.toLowerCase()));
+      if (alreadyCorrect) {
+        console.log(`[ZettaCore][gemini] ✅ Ya en modo "${currentText}", sin cambio.`);
         return;
       }
 
-      console.log(`[ZettaCore][gemini] 🔄 Cambiando de "${currentText}" a "${targetLabel}"...`);
+      console.log(`[ZettaCore][gemini] 🔄 Cambiando de "${currentText}" a "${labels[0]}"...`);
       await humanClick(pillBtn);
 
       // Esperar activamente a que aparezcan las opciones del menú (hasta 3s)
@@ -71,9 +81,10 @@
           const fromShadow = deepQuerySelectorAll(sel);
           const fromBody = Array.from(document.querySelectorAll(sel));
           const candidates = [...new Set([...fromShadow, ...fromBody])];
-          option = candidates.find(el =>
-            el.innerText?.trim().toLowerCase().includes(targetLabel.toLowerCase())
-          );
+        // Buscar la opción que coincida con cualquiera de los labels posibles
+        option = candidates.find(el =>
+          labels.some(l => el.innerText?.trim().toLowerCase().includes(l.toLowerCase()))
+        );
           if (option) break;
         }
       }
@@ -81,11 +92,29 @@
       if (option) {
         console.log(`[ZettaCore][gemini] 🎯 Opción "${targetLabel}" encontrada. Haciendo clic...`);
         await humanClick(option);
-        await randomDelay(400, 700);
+        await randomDelay(600, 300);
+
+        // ── Verificación post-clic: confirmar que el pill cambió ──
+        const newText = pillBtn.innerText?.trim() || '';
+        const confirmed = labels.some(l => newText.toLowerCase().includes(l.toLowerCase()));
+        if (!confirmed) {
+          await randomDelay(400, 200);
+          const newPill = deepQuerySelector('[data-test-id="logo-pill-label-container"]');
+          const confirmedText = newPill?.innerText?.trim() || '';
+          const confirmedRetry = labels.some(l => confirmedText.toLowerCase().includes(l.toLowerCase()));
+          if (!confirmedRetry) {
+            throw new Error(
+              `Modo "${labels[0]}" no confirmado tras selección. Pill actual: "${confirmedText || newText}"`
+            );
+          }
+        }
+        console.log(`[ZettaCore][gemini] ✅ Modo confirmado: "${pillBtn.innerText?.trim()}"`);
       } else {
-        console.warn(`[ZettaCore][gemini] ⚠️ No se encontró la opción "${targetLabel}" en el menú después de 3s.`);
-        // Cerrar el menú
+        // Cerrar el menú y lanzar error real — no continuar con Fast
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        throw new Error(
+          `Ninguno de los labels ${JSON.stringify(labels)} encontrado en el menú de Gemini después de 3s.`
+        );
       }
     }
 

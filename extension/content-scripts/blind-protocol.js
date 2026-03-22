@@ -136,7 +136,7 @@
    */
   async function humanType(element, text) {
     element.focus();
-    await randomDelay(200, 500);
+    await randomDelay(80, 200);
 
     const isContentEditable = element.isContentEditable || element.getAttribute('contenteditable') === 'true';
 
@@ -163,7 +163,7 @@
     const pressBackspace = async () => {
       const bsProps = { key: 'Backspace', code: 'Backspace', bubbles: true, cancelable: true };
       element.dispatchEvent(new KeyboardEvent('keydown', bsProps));
-      await randomDelay(40, 90);
+      await randomDelay(20, 45);
       if (isContentEditable) {
         document.execCommand('delete');
       } else {
@@ -171,7 +171,7 @@
         element.dispatchEvent(new window.Event('input', { bubbles: true }));
       }
       element.dispatchEvent(new KeyboardEvent('keyup', bsProps));
-      await randomDelay(60, 130);
+      await randomDelay(30, 65);
     };
 
     // Función para presionar y escribir un carácter
@@ -201,21 +201,21 @@
 
       let delay;
       if (isAfterPunctuation && Math.random() < 0.4) {
-        delay = Math.floor(Math.random() * 600 + 300);  // pausa de pensamiento: 300-900ms
+        delay = Math.floor(Math.random() * 150 + 75);  // pausa pens.: 75-225ms (mitad)
         streakSpeed = 0;
       } else if (isPunctuation && Math.random() < 0.2) {
-        delay = Math.floor(Math.random() * 250 + 100);  // pausa media en coma/espacio
+        delay = Math.floor(Math.random() * 50 + 25);   // pausa media: 25-75ms (mitad)
       } else {
-        // Velocidad con "efecto racha": se acelera progresivamente hasta un mínimo
-        const baseDelay = Math.max(30, 120 - streakSpeed * 3);
-        delay = Math.floor(Math.random() * baseDelay + 30);
-        streakSpeed = Math.min(25, streakSpeed + 1);
+        // Velocidad con "efecto racha" — base dobla la velocidad
+        const baseDelay = Math.max(8, 30 - streakSpeed);
+        delay = Math.floor(Math.random() * baseDelay + 8);
+        streakSpeed = Math.min(22, streakSpeed + 1);
       }
 
-      // --- Errata aleatoria (8% de probabilidad), excepto en caracteres especiales ---
+      // --- Errata aleatoria (2.4% de probabilidad = 70% menos que antes), excepto en caracteres especiales ---
       const lowerChar = char.toLowerCase();
       const typoChars = adjacentKeys[lowerChar];
-      if (typoChars && Math.random() < 0.08) {
+      if (typoChars && Math.random() < 0.024) {
         // Escribir carácter incorrecto adyacente
         const wrongChar = typoChars[Math.floor(Math.random() * typoChars.length)];
         await pressChar(wrongChar);
@@ -252,11 +252,87 @@
     element.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control', code: 'ControlLeft', ...ctrl }));
   }
 
+  /**
+   * CDP Click: clic nativo real vía Chrome Debugger Protocol.
+   * A diferencia de humanClick(), este clic entra por la ruta nativa del browser,
+   * no por dispatchEvent(). React/Radix lo procesa correctamente.
+   *
+   * Precondiciones verificadas internamente:
+   * - El elemento existe y es visible (offsetParent !== null)
+   * - Las coordenadas están dentro del viewport
+   *
+   * @param {Element} element - El elemento a clickear
+   * @param {object} [opts]
+   * @param {number} [opts.waitForViewport=2000] - ms máx para esperar que el elemento entre al viewport
+   * @returns {Promise<boolean>} - true si CDP tuvo éxito, false si usó fallback
+   */
+  async function cdpClick(element, opts = {}) {
+    const { waitForViewport = 2000 } = opts;
+
+    if (!element) {
+      console.warn('[ZettaCore][cdpClick] Elemento null, saltando.');
+      return false;
+    }
+
+    // Esperar hasta que el elemento esté visible y en el viewport
+    const deadline = Date.now() + waitForViewport;
+    let rect;
+    while (Date.now() < deadline) {
+      rect = element.getBoundingClientRect();
+      const isVisible = element.offsetParent !== null || element.offsetWidth > 0 || element.offsetHeight > 0;
+      const inViewport = rect.top >= 0 && rect.left >= 0 &&
+                         rect.bottom <= window.innerHeight &&
+                         rect.right <= window.innerWidth;
+      if (isVisible && inViewport && rect.width > 0 && rect.height > 0) break;
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    // Calcular punto central con pequeña variación humana
+    rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2 + (Math.random() * 6 - 3);
+    const y = rect.top + rect.height / 2 + (Math.random() * 6 - 3);
+
+    // Verificar que las coordenadas son válidas y están en el viewport
+    if (rect.width === 0 || rect.height === 0 ||
+        x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+      console.warn(`[ZettaCore][cdpClick] Elemento fuera del viewport o sin dimensiones. Usando humanClick() como fallback.`);
+      await humanClick(element);
+      return false;
+    }
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ action: 'cdp_click', x, y }, (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(response);
+          }
+        });
+      });
+
+      if (result && result.success) {
+        console.log(`[ZettaCore][cdpClick] ✅ Clic CDP en (${Math.round(x)}, ${Math.round(y)})`);
+        return true;
+      } else {
+        console.warn(`[ZettaCore][cdpClick] ⚠️ CDP falló: ${result?.error}. Usando humanClick() como fallback.`);
+        await humanClick(element);
+        return false;
+      }
+    } catch (err) {
+      console.warn(`[ZettaCore][cdpClick] ⚠️ Error enviando mensaje: ${err.message}. Usando humanClick() como fallback.`);
+      await humanClick(element);
+      return false;
+    }
+  }
+
+
   // Exponer API globalmente
   window.ZettaBlindProtocol = {
     randomDelay,
     simulateMouseMove,
     humanClick,
+    cdpClick,
     wakeUpField,
     humanType,
     pressCtrlEnter,

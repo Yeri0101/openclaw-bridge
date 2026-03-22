@@ -9,14 +9,16 @@
     "storage",
     "cookies",
     "tabs",
-    "alarms"
+    "alarms",
+    "debugger"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://gemini.google.com/*",
     "https://chat.qwenlm.ai/*",
     "https://*.arena.ai/*",
-    "https://arena.ai/*"
+    "https://arena.ai/*",
+    "https://sora.chatgpt.com/*"
   ],
   "action": {
     "default_popup": "popup/index.html",
@@ -63,6 +65,16 @@
         "content-scripts/blind-protocol.js",
         "content-scripts/common.js",
         "content-scripts/arena.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://sora.chatgpt.com/*"],
+      "js": [
+        "content-scripts/shadow-walker.js",
+        "content-scripts/blind-protocol.js",
+        "content-scripts/common.js",
+        "content-scripts/sora.js"
       ],
       "run_at": "document_idle"
     }
