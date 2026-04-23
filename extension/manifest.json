@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "OpenClaw ZettaCore Bridge",
-  "version": "1.2",
-  "description": "Puente local entre OpenClaw y las interfaces web de LLMs comerciales.",
+  "name": "any-ai-gateway_web",
+  "version": "1.3",
+  "description": "Local gateway that exposes an OpenAI-compatible API by routing requests through your Chrome browser session to any LLM web UI (Arena, Gemini, ChatGPT, Qwen).",
   "permissions": [
     "activeTab",
     "scripting",
@@ -22,14 +22,16 @@
   ],
   "action": {
     "default_popup": "popup/index.html",
-    "default_title": "ZettaCore Bridge"
+    "default_title": "any-ai-gateway"
   },
   "background": {
     "service_worker": "service-worker.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://gemini.google.com/*"],
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
       "js": [
         "content-scripts/shadow-walker.js",
         "content-scripts/blind-protocol.js",
@@ -39,7 +41,9 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://chatgpt.com/*"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
       "js": [
         "content-scripts/shadow-walker.js",
         "content-scripts/blind-protocol.js",
@@ -49,7 +53,9 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://chat.qwenlm.ai/*"],
+      "matches": [
+        "https://chat.qwenlm.ai/*"
+      ],
       "js": [
         "content-scripts/shadow-walker.js",
         "content-scripts/blind-protocol.js",
@@ -59,7 +65,10 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.arena.ai/*", "https://arena.ai/*"],
+      "matches": [
+        "https://*.arena.ai/*",
+        "https://arena.ai/*"
+      ],
       "js": [
         "content-scripts/shadow-walker.js",
         "content-scripts/blind-protocol.js",
@@ -69,7 +78,9 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://sora.chatgpt.com/*"],
+      "matches": [
+        "https://sora.chatgpt.com/*"
+      ],
       "js": [
         "content-scripts/shadow-walker.js",
         "content-scripts/blind-protocol.js",
