@@ -9,7 +9,7 @@ type Translations = {
 
 const translations: Translations = {
     en: {
-        'nav.title': 'OpenClaw Gateway',
+        'nav.title': 'TierMax',
         'nav.logout': 'Logout',
         'nav.change_password': 'Change Password',
         'settings.password_title': 'Change Password',
@@ -20,7 +20,7 @@ const translations: Translations = {
         'settings.success': 'Password updated successfully!',
         'settings.error': 'Failed to update password.',
         'dashboard.title': 'Projects',
-        'dashboard.subtitle': 'Manage your OpenClaw API gateways and agents',
+        'dashboard.subtitle': 'Manage your AI gateways and upstream providers',
         'dashboard.create_title': 'Create New Project',
         'dashboard.create_desc': 'A project groups your Upstream API keys (Groq, OpenRouter) and Gateway keys.',
         'dashboard.input_placeholder': 'e.g. Main Agency',
@@ -92,7 +92,7 @@ const translations: Translations = {
         'project.analytics.export': 'Export to Markdown',
         'project.analytics.recent_requests': 'Recent Requests',
         'login.title': 'Welcome Back',
-        'login.subtitle': 'Sign in to OpenClaw Dashboard',
+        'login.subtitle': 'Sign in to TierMax Dashboard',
         'login.email': 'Email',
         'login.password': 'Password',
         'login.btn_signin': 'Sign In',
@@ -100,7 +100,7 @@ const translations: Translations = {
         'login.error': 'Login failed',
     },
     es: {
-        'nav.title': 'OpenClaw Gateway',
+        'nav.title': 'TierMax',
         'nav.logout': 'Cerrar Sesión',
         'nav.change_password': 'Cambiar Contraseña',
         'settings.password_title': 'Cambiar Contraseña',
@@ -111,7 +111,7 @@ const translations: Translations = {
         'settings.success': '¡Contraseña actualizada con éxito!',
         'settings.error': 'Error al actualizar la contraseña.',
         'dashboard.title': 'Proyectos',
-        'dashboard.subtitle': 'Gestiona tus API gateways y agentes de OpenClaw',
+        'dashboard.subtitle': 'Gestiona tus API gateways y proveedores upstream',
         'dashboard.create_title': 'Crear Nuevo Proyecto',
         'dashboard.create_desc': 'Un proyecto agrupa tus claves de API "Upstream" (Groq, OpenRouter) y claves Gateway.',
         'dashboard.input_placeholder': 'ej. Agencia Principal',
@@ -183,7 +183,7 @@ const translations: Translations = {
         'project.analytics.export': 'Exportar a Markdown',
         'project.analytics.recent_requests': 'Peticiones Recientes',
         'login.title': 'Bienvenido',
-        'login.subtitle': 'Inicia sesión en OpenClaw',
+        'login.subtitle': 'Inicia sesión en TierMax',
         'login.email': 'Correo Electrónico',
         'login.password': 'Contraseña',
         'login.btn_signin': 'Iniciar Sesión',

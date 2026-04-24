@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchApi } from '../api';
-import { FolderOpen, Plus, Trash2, Edit2, Zap, Palette, Key, Activity } from 'lucide-react';
+import { FolderOpen, Plus, Trash2, Edit2, Zap, Palette, Key, Activity, Copy, Check } from 'lucide-react';
 import { useLanguage } from '../i18n';
 
 type GatewayKeyPreview = {
@@ -48,6 +48,20 @@ export default function Dashboard() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
     const [colorPickerId, setColorPickerId] = useState<string | null>(null);
+    const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+
+    const handleCopyKey = async (keyId: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+            const data = await fetchApi(`/gateway-keys/${keyId}/reveal`);
+            await navigator.clipboard.writeText(data.api_key);
+            setCopiedKeyId(keyId);
+            setTimeout(() => setCopiedKeyId(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy key:', err);
+        }
+    };
 
     const loadProjects = async () => {
         try {
@@ -377,16 +391,36 @@ export default function Dashboard() {
                                 {p.gateway_keys && p.gateway_keys.length > 0 && (
                                     <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                                         {p.gateway_keys.map(gk => (
-                                            <div key={gk.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <div key={gk.id} className="card-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                                 <Key size={10} style={{ color: projColor, flexShrink: 0 }} />
-                                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.1rem 0.4rem', letterSpacing: '0.04em' }}>
+                                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '0.1rem 0.4rem', letterSpacing: '0.04em', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {gk.key_preview}
                                                 </span>
                                                 {gk.key_name && (
-                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80px' }}>
                                                         {gk.key_name}
                                                     </span>
                                                 )}
+                                                <button
+                                                    onClick={e => handleCopyKey(gk.id, e)}
+                                                    title={copiedKeyId === gk.id ? 'Copied!' : 'Copy API key'}
+                                                    style={{
+                                                        background: copiedKeyId === gk.id ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)',
+                                                        border: `1px solid ${copiedKeyId === gk.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                                                        cursor: 'pointer',
+                                                        color: copiedKeyId === gk.id ? '#22c55e' : 'var(--text-secondary)',
+                                                        padding: '0.2rem 0.35rem',
+                                                        borderRadius: '5px',
+                                                        transition: 'all 0.15s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    {copiedKeyId === gk.id
+                                                        ? <Check size={11} />
+                                                        : <Copy size={11} />}
+                                                </button>
                                             </div>
                                         ))}
                                     </div>

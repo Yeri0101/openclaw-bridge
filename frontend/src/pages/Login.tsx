@@ -45,7 +45,7 @@ export default function Login() {
                 <Layers size={32} style={{ color: 'white' }} />
             </div>
 
-            <h1 className="login-title" style={{ fontSize: '1.65rem', marginBottom: '0.25rem' }}>OpenClaw Gateway</h1>
+            <h1 className="login-title" style={{ fontSize: '1.65rem', marginBottom: '0.25rem' }}>TierMax</h1>
             <p className="login-subtitle" style={{ marginBottom: '2rem' }}>{t('login.subtitle')}</p>
 
             {/* Card */}

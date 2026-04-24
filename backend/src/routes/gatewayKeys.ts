@@ -77,6 +77,18 @@ gatewayKeys.delete('/:id', async (c) => {
     return c.json({ success: true });
 });
 
+// Reveal the full api_key value for clipboard copy — admin-only
+gatewayKeys.get('/:id/reveal', async (c) => {
+    const { id } = c.req.param();
+    const { data, error } = await supabase
+        .from('gateway_keys')
+        .select('api_key')
+        .eq('id', id)
+        .single();
+    if (error || !data) return c.json({ error: 'Key not found' }, 404);
+    return c.json({ api_key: data.api_key });
+});
+
 gatewayKeys.post('/:id/models', async (c) => {
     const { id } = c.req.param();
     const { models } = await c.req.json();

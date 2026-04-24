@@ -57,7 +57,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <Layers size={18} style={{ color: 'white' }} />
           </div>
           <div>
-            <div className="navbar-title">OpenClaw</div>
+            <div className="navbar-title">TierMax</div>
             <div className="navbar-subtitle">Gateway · SOAT</div>
           </div>
         </Link>
