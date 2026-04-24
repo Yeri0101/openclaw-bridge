@@ -1,6 +1,6 @@
-# 🌉 openclaw-bridge
+# 🌉 Any-ai-gateway_web_bridge
 
-A local bridge that lets AI agents talk to Gemini, ChatGPT, Qwen, Arena (Claude), and Sora — **without any API keys**. It works by routing requests through your Chrome browser, where you're already logged in.
+A local bridge that lets AI agents talk to Gemini, ChatGPT, Qwen and Arena.ai — **without any API keys**. It works by routing requests through your Chrome browser, where you're already logged in.
 
 The bridge exposes an OpenAI-compatible HTTP API on `localhost:8000`, so any agent or tool that speaks the OpenAI format just works — no changes needed on their end.
 
