@@ -57,7 +57,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             <Layers size={18} style={{ color: 'white' }} />
           </div>
           <div>
-            <div className="navbar-title">TierMax</div>
+            <div className="navbar-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              TierMax
+              <span style={{
+                fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.06em',
+                background: 'rgba(255,107,43,0.15)', border: '1px solid rgba(255,107,43,0.35)',
+                color: 'var(--brand-orange)', borderRadius: '4px',
+                padding: '0.05rem 0.35rem', lineHeight: 1.4,
+              }}>v2.1</span>
+            </div>
             <div className="navbar-subtitle">Gateway · SOAT</div>
           </div>
         </Link>
