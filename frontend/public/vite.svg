@@ -1,0 +1,12 @@
+<svg viewBox="0 0 100 100" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="omniGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#FF2A55" />
+            <stop offset="100%" stop-color="#FF9900" />
+        </linearGradient>
+    </defs>
+    <!-- Obturador / Botón Play -->
+    <path d="M 45,15 A 35,35 0 0,0 45,85 L 85,50 Z" fill="none" stroke="url(#omniGradient)" stroke-width="12" stroke-linejoin="round"/>
+    <!-- Cerebro IA Central -->
+    <circle cx="40" cy="50" r="10" fill="url(#omniGradient)" />
+</svg>
