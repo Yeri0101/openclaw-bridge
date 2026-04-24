@@ -49,6 +49,7 @@ export default function Dashboard() {
     const [editName, setEditName] = useState('');
     const [colorPickerId, setColorPickerId] = useState<string | null>(null);
     const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+    const [hidingKeyId, setHidingKeyId] = useState<string | null>(null);
 
     const handleCopyKey = async (keyId: string, e: React.MouseEvent) => {
         e.preventDefault();
@@ -57,7 +58,10 @@ export default function Dashboard() {
             const data = await fetchApi(`/gateway-keys/${keyId}/reveal`);
             await navigator.clipboard.writeText(data.api_key);
             setCopiedKeyId(keyId);
-            setTimeout(() => setCopiedKeyId(null), 2000);
+            setHidingKeyId(null);
+            // After 2.7s start hide animation, clear at 3s
+            setTimeout(() => setHidingKeyId(keyId), 2700);
+            setTimeout(() => { setCopiedKeyId(null); setHidingKeyId(null); }, 3000);
         } catch (err) {
             console.error('Failed to copy key:', err);
         }
@@ -405,6 +409,7 @@ export default function Dashboard() {
                                                     onClick={e => handleCopyKey(gk.id, e)}
                                                     title={copiedKeyId === gk.id ? 'Copied!' : 'Copy API key'}
                                                     style={{
+                                                        position: 'relative',
                                                         background: copiedKeyId === gk.id ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)',
                                                         border: `1px solid ${copiedKeyId === gk.id ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`,
                                                         cursor: 'pointer',
@@ -420,6 +425,11 @@ export default function Dashboard() {
                                                     {copiedKeyId === gk.id
                                                         ? <Check size={11} />
                                                         : <Copy size={11} />}
+                                                    {copiedKeyId === gk.id && (
+                                                        <span className={`copy-popup${hidingKeyId === gk.id ? ' hiding' : ''}`}>
+                                                            ✓ Copied!
+                                                        </span>
+                                                    )}
                                                 </button>
                                             </div>
                                         ))}
