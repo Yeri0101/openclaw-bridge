@@ -4,11 +4,11 @@ import { fetchApi } from '../api';
 import {
     KeyRound, Server, ChevronLeft, Trash2, Plus, RefreshCw,
     Activity, Pause, Play, Zap, Shield, Download, AlertTriangle,
-    CheckCircle2, XCircle, Clock, Cpu
+    CheckCircle2, XCircle, Clock, Cpu, Sliders
 } from 'lucide-react';
 import { useLanguage } from '../i18n';
 
-type UpstreamKey = { id: string; provider: string; created_at: string; key_preview?: string; max_context_tokens?: number | null };
+type UpstreamKey = { id: string; provider: string; created_at: string; key_preview?: string; max_context_tokens?: number | null; max_output_tokens?: number | null };
 type GatewayKey = { id: string; key_name: string; api_key: string; gateway_key_models: any[] };
 type PricingEntry = {
     id: string;
@@ -137,6 +137,8 @@ export default function ProjectDetail() {
     const [addModelSearch, setAddModelSearch] = useState<Record<string, string>>({});
     const [isTestingAll, setIsTestingAll] = useState(false);
     const [testProviderResults, setTestProviderResults] = useState<Record<string, { success: boolean; msg: string; testing: boolean }>>({});
+    const [tokenLimitModal, setTokenLimitModal] = useState<{ mode: 'global' | 'single'; providerId?: string; providerName?: string } | null>(null);
+    const [tokenLimitInput, setTokenLimitInput] = useState<string>('');
 
     /* ─── Data loading ─── */
     const loadData = async () => {
@@ -306,6 +308,38 @@ export default function ProjectDetail() {
     const handlePauseAllProjectProviders = async () => {
         try { await fetchApi(`/projects/${id}/pause-all`, { method: 'POST' }); loadData(); }
         catch { alert('Failed to pause project providers'); }
+    };
+
+    const openTokenLimitModal = (mode: 'global' | 'single', providerId?: string, providerName?: string) => {
+        const current = mode === 'single'
+            ? providers.find(p => p.id === providerId)?.max_output_tokens
+            : null;
+        setTokenLimitInput(current != null ? String(current) : '');
+        setTokenLimitModal({ mode, providerId, providerName });
+    };
+
+    const handleSaveTokenLimit = async () => {
+        if (!tokenLimitModal) return;
+        const value = tokenLimitInput.trim() === '' ? null : Number(tokenLimitInput);
+        if (value !== null && (isNaN(value) || value < 100)) {
+            alert('Enter a number ≥ 100, or leave blank to remove the limit (uses gateway default)');
+            return;
+        }
+        try {
+            if (tokenLimitModal.mode === 'global') {
+                await fetchApi('/providers/output-token-limit-all', {
+                    method: 'PATCH',
+                    body: JSON.stringify({ max_output_tokens: value }),
+                });
+            } else if (tokenLimitModal.providerId) {
+                await fetchApi(`/providers/${tokenLimitModal.providerId}/output-token-limit`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ max_output_tokens: value }),
+                });
+            }
+            setTokenLimitModal(null);
+            loadData();
+        } catch { alert('Failed to save token limit'); }
     };
 
     const handleResetProvider = async (provId: string) => {
@@ -611,6 +645,9 @@ export default function ProjectDetail() {
                                     <button onClick={handleResetAllProviders} className="btn btn-success btn-sm">
                                         <RefreshCw size={13} /> Reset All
                                     </button>
+                                    <button onClick={() => openTokenLimitModal('global')} className="btn btn-sm" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.35)', color: '#a78bfa' }}>
+                                        <Sliders size={13} /> Token Limit
+                                    </button>
                                     <button onClick={handlePingAllProviders} className="btn btn-primary btn-sm" disabled={isTestingAll}>
                                         {isTestingAll ? <span className="spinner-ring" style={{ width: 13, height: 13, borderWidth: 2 }} /> : <Zap size={13} />} Test All
                                     </button>
@@ -635,6 +672,7 @@ export default function ProjectDetail() {
                                                 <th>{t('project.status')}</th>
                                                 <th>{t('project.usage')}</th>
                                                 <th>Ctx Limit</th>
+                                                <th>Output Limit</th>
                                                 <th>{t('project.actions')}</th>
                                             </tr>
                                         </thead>
@@ -694,6 +732,19 @@ export default function ProjectDetail() {
                                                                     onClick={() => setCtxLimitEdit(prev => ({ ...prev, [p.id]: p.max_context_tokens != null ? String(p.max_context_tokens) : '' }))}
                                                                 />
                                                             )}
+                                                        </td>
+                                                        <td>
+                                                            {/* Output Token Limit pill */}
+                                                            <button
+                                                                className={`ctx-pill ${p.max_output_tokens != null && p.max_output_tokens > 0 ? 'has-limit' : ''}`}
+                                                                onClick={() => openTokenLimitModal('single', p.id, p.provider)}
+                                                                title={p.max_output_tokens ? `Output cap: ${p.max_output_tokens.toLocaleString()} tokens — click to edit` : 'No cap (uses gateway default 16k) — click to set'}
+                                                            >
+                                                                {p.max_output_tokens && p.max_output_tokens > 0
+                                                                    ? `${(p.max_output_tokens / 1000).toFixed(0)}K out`
+                                                                    : '∞ Default'}
+                                                                <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>✎</span>
+                                                            </button>
                                                         </td>
                                                         <td>
                                                             <div className="flex gap-2">
@@ -1253,6 +1304,118 @@ export default function ProjectDetail() {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ TOKEN LIMIT MODAL ═══ */}
+            {tokenLimitModal && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    animation: 'fadeIn 0.2s ease-out',
+                }} onClick={() => setTokenLimitModal(null)}>
+                    <div style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid rgba(139,92,246,0.35)',
+                        borderRadius: 'var(--radius-xl)',
+                        padding: '2rem',
+                        width: '100%', maxWidth: 420,
+                        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.2)',
+                        position: 'relative',
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                            <div style={{
+                                width: 40, height: 40, borderRadius: 'var(--radius-md)',
+                                background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Sliders size={18} style={{ color: '#a78bfa' }} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>
+                                    {tokenLimitModal.mode === 'global' ? 'Global Output Token Limit' : `Token Limit — ${tokenLimitModal.providerName}`}
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                                    {tokenLimitModal.mode === 'global'
+                                        ? 'Applies to ALL providers in this project'
+                                        : 'Applies only to this provider'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Info box */}
+                        <div style={{
+                            background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
+                            borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem',
+                            marginBottom: '1.25rem', fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.6,
+                        }}>
+                            <strong style={{ color: '#a78bfa' }}>max_tokens cap</strong> — el gateway trunca las respuestas de salida al valor que configures aquí.
+                            Deja en blanco para usar el default global (16,000). Google &amp; Vertex están exentos siempre.
+                        </div>
+
+                        {/* Presets */}
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                            {[null, 4096, 8192, 16000, 32000, 65536, 131072].map(v => (
+                                <button
+                                    key={v ?? 'default'}
+                                    onClick={() => setTokenLimitInput(v === null ? '' : String(v))}
+                                    style={{
+                                        padding: '0.3rem 0.65rem',
+                                        borderRadius: 'var(--radius-pill)',
+                                        fontSize: '0.72rem', fontWeight: 700, fontFamily: 'var(--font-mono)',
+                                        background: tokenLimitInput === (v === null ? '' : String(v))
+                                            ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.06)',
+                                        border: tokenLimitInput === (v === null ? '' : String(v))
+                                            ? '1px solid rgba(139,92,246,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                                        color: tokenLimitInput === (v === null ? '' : String(v))
+                                            ? '#c4b5fd' : 'var(--text-secondary)',
+                                        cursor: 'pointer', transition: 'all 0.15s',
+                                    }}
+                                >
+                                    {v === null ? '∞ Default' : v >= 1000 ? `${v / 1024 >= 1 ? (v / 1024).toFixed(0) + 'k' : v}` : v}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Input */}
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.4rem' }}>
+                                Custom value (tokens)
+                            </label>
+                            <input
+                                type="number"
+                                min={100}
+                                step={512}
+                                value={tokenLimitInput}
+                                onChange={e => setTokenLimitInput(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSaveTokenLimit(); if (e.key === 'Escape') setTokenLimitModal(null); }}
+                                placeholder="Blank = use gateway default (16,000)"
+                                autoFocus
+                                style={{ width: '100%', marginBottom: 0, fontFamily: 'var(--font-mono)', fontSize: '1rem', padding: '0.65rem 0.85rem', borderColor: 'rgba(139,92,246,0.4)' }}
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                onClick={() => setTokenLimitModal(null)}
+                                className="btn btn-secondary"
+                                style={{ flex: 1 }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveTokenLimit}
+                                className="btn btn-sm"
+                                style={{ flex: 2, background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)', color: '#c4b5fd', fontSize: '0.9rem', padding: '0.65rem 1rem', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                            >
+                                <Sliders size={14} />
+                                {tokenLimitModal.mode === 'global' ? 'Apply to All Providers' : 'Save Token Limit'}
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -4,7 +4,7 @@
 
 **A self-hosted AI API gateway with smart routing, automatic failover, round-robin load balancing, semantic caching, and a real-time web dashboard.**
 
-[![Version](https://img.shields.io/badge/version-2.1-orange?style=flat-square)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.2-orange?style=flat-square)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![Stack](https://img.shields.io/badge/stack-Node.js%20%7C%20React%20%7C%20Supabase-blueviolet?style=flat-square)](#tech-stack)
 
@@ -494,9 +494,13 @@ From this point, every request OpenClaw makes goes through TierMax. You get auto
 | `SUPABASE_URL` | ✅ | — | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | ✅ | — | Supabase anon key (Project Settings → API) |
 | `ADMIN_JWT_SECRET` | ✅ | — | Secret used to sign admin JWT tokens |
-| `SOAT_PREMIUM_BYPASS_KEY` | No | — | A gateway key that bypasses tier limits for premium requests |
+| `SOAT_PREMIUM_BYPASS_KEY` | No | — | A gateway key that bypasses the output token cap and tier limits |
+| `SOAT_DEFAULT_MAX_TOKENS` | No | `16000` | Global default output token cap applied to all providers (overridden per-provider from the dashboard) |
 | `CACHE_TTL_SECONDS` | No | `60` | Seconds to cache identical responses in memory |
 | `CACHE_MAX_SIZE` | No | `500` | Max number of entries in the LRU cache |
+| `LATENCY_TIMEOUT_MS` | No | `15000` | Ms after which a slow response counts toward the slow threshold |
+| `LATENCY_SLOW_WINDOW_MS` | No | `60000` | How long (ms) a slow-flagged provider is skipped |
+| `LATENCY_SLOW_THRESHOLD` | No | `2` | Consecutive slow responses before a provider is flagged |
 | `TIER_CONFIG_JSON` | No | *(see tierConfig.ts)* | JSON override for tier → provider mapping |
 
 ### Frontend (`frontend/.env`)
@@ -556,6 +560,97 @@ Returns the full `api_key` value for a gateway key. Used internally by the dashb
 
 ---
 
+## Gateway Limits & Controls
+
+TierMax applies several layers of control to every request. Here is the complete pipeline, in order of execution:
+
+```
+Incoming request
+    │
+    ├─ 1. Auth guard          → rejects invalid/missing gateway key (HTTP 401)
+    ├─ 2. Model allowlist      → rejects models not assigned to this key (HTTP 403)
+    ├─ 3. Budget check         → blocks requests when project spend ≥ budget_usd (HTTP 402)
+    ├─ 4. Provider health      → skips paused / rate-limited / error providers
+    ├─ 5. Latency guard        → skips providers flagged as slow
+    ├─ 6. Semantic cache        → returns cached response for identical prompts (no upstream call)
+    ├─ 7. Smart router (SOAT)  → selects the best upstream tier for the request
+    ├─ 8. Context trim          → trims oldest messages to fit provider's context window
+    └─ 9. Output token cap      → truncates max_tokens to per-provider (or global) limit
+```
+
+### 1. Authentication
+
+Every request to `/v1/*` must include `Authorization: Bearer <gateway_key>`. The key is validated against the `gateway_keys` table in Supabase.
+
+### 2. Model Allowlist
+
+Each gateway key can only use the models explicitly assigned to it from the dashboard. Requesting any other model returns HTTP 403.
+
+### 3. Project Budget
+
+Projects can have an optional `budget_usd` limit. When cumulative spend (tracked via `request_logs.total_cost_usd`) reaches the budget, all further requests for that project return HTTP 402 until the budget is raised or reset.
+
+### 4. Provider Health States
+
+Each upstream key has a runtime health state tracked in memory:
+
+| State | Behaviour | Auto-recovery |
+|---|---|---|
+| `healthy` | Normal — accepts requests | — |
+| `rate_limited` | Skipped in routing | After 60 s or next minute window |
+| `error` | Skipped in routing | After 15 s or next minute window |
+| `paused` | Blocked permanently | Manual Resume from dashboard |
+
+From the **Configured Providers** panel you can **Pause**, **Resume**, and **Reset** individual keys or all at once.
+
+### 5. Latency Guard
+
+If a provider responds slowly **2 consecutive times** (default threshold: ≥ 15,000 ms), it is flagged as *slow* and skipped in the fallback loop for **60 seconds**. This keeps response times predictable without permanently removing the provider.
+
+Configurable via env vars:
+
+```env
+LATENCY_TIMEOUT_MS=15000      # Slow threshold per response
+LATENCY_SLOW_WINDOW_MS=60000  # How long the penalty lasts
+LATENCY_SLOW_THRESHOLD=2      # Consecutive slow hits before flagging
+```
+
+### 6. Semantic Cache
+
+Non-streaming requests with identical `model + messages` are served from an in-memory LRU cache without calling the upstream provider. Cache hits return the header `X-Cache: HIT`.
+
+- Default TTL: **60 seconds** (`CACHE_TTL_SECONDS`)
+- Max entries: **500** (`CACHE_MAX_SIZE`)
+- Key: SHA-256 hash of `model + JSON.stringify(messages)`
+
+### 7. SOAT Smart Router
+
+See [SOAT Smart Router](#soat-smart-router) section above.
+
+### 8. Context Trim Guard
+
+If an upstream key has `max_context_tokens` configured (set from the dashboard **Ctx Limit** column), the gateway automatically trims the oldest messages from the conversation history before forwarding — preserving the system prompt and the latest user message. This prevents context-overflow errors without failing the request.
+
+### 9. Output Token Cap (`max_output_tokens`)
+
+The `max_tokens` field in every request is silently capped before it reaches the provider. The effective cap is resolved in this priority order:
+
+1. **Per-provider value** — set from the dashboard **Output Limit** column (stored as `max_output_tokens` in `upstream_keys`)
+2. **Global env default** — `SOAT_DEFAULT_MAX_TOKENS` (e.g. `32000`)
+3. **Hardcoded fallback** — `16,000`
+
+> **Exempt:** Google, Vertex, and any key matching `SOAT_PREMIUM_BYPASS_KEY` are never capped.
+
+**From the dashboard** you can configure output limits without touching env vars:
+
+- **Token Limit** button in the *Configured Providers* panel header → applies a cap to **all providers** in the project at once
+- **Output Limit** pill per row in the same panel → applies a cap to a **single provider**
+- Leave blank / set to ∞ Default to remove the per-provider cap and fall back to the global default
+
+> ⚠️ This cap is per-**request** (it truncates `max_tokens`). It is separate from the token-per-minute/day counters shown in the Usage column.
+
+---
+
 ## Security notes
 
 - **Upstream keys** are stored in Supabase, never exposed to clients.
@@ -568,6 +663,14 @@ Returns the full `api_key` value for a gateway key. Used internally by the dashb
 ---
 
 ## Changelog
+
+### v2.2 (2026-04-25)
+- **Output Token Cap UI** — new **Token Limit** button in the Configured Providers panel header. Opens a modal with quick presets (4K, 8K, 16K, 32K, 64K, 128K) and a custom input. Applies globally to all providers or individually per provider
+- **Per-provider Output Limit column** — clickable pill in the providers table shows the active cap and opens the same modal
+- **Dynamic token cap backend** — cap is now stored in `upstream_keys.max_output_tokens` (DB column) and resolved at request time: per-provider DB value → `SOAT_DEFAULT_MAX_TOKENS` env var → 16,000 hardcoded fallback
+- **New API endpoints** — `PATCH /api/providers/:id/output-token-limit` and `PATCH /api/providers/output-token-limit-all`
+- **Cap logging** — every time a `max_tokens` value is capped, a `[TokenCap]` log line is emitted with provider, effective cap, and source (DB vs env)
+- **Gateway limits documentation** — added full *Gateway Limits & Controls* section to README
 
 ### v2.1 (2026-04-24)
 - **Rebrand:** App renamed from "OpenClaw Gateway" to **TierMax** across all UI surfaces (navbar, login, dashboard, i18n EN + ES)

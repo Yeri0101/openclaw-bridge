@@ -510,13 +510,21 @@ v1.post('/chat/completions', async (c) => {
             // ─────────────────────────────────────────────────────────────────
 
             // Cap max_tokens to prevent provider rejections and credit pre-reservation issues on OpenRouter
-            // SOAT Override: Do not limit if it's the premium 'Open router_Prim' project API key
+            // Priority: 1) per-provider max_output_tokens from DB  2) env var SOAT_DEFAULT_MAX_TOKENS  3) hardcoded 16000
+            // SOAT Override: Premium key (SOAT_PREMIUM_BYPASS_KEY) and Google/Vertex are always exempt.
             const premiumKey = process.env.SOAT_PREMIUM_BYPASS_KEY || '';
             const isPremiumProject = premiumKey.length > 0 && typeof gatewayKey?.id === 'string' && gatewayKey.id === premiumKey;
 
             if (!isPremiumProject && upstream.provider !== 'google' && upstream.provider !== 'vertex') {
-                if (forwardBody.max_tokens && forwardBody.max_tokens > 16000) {
-                    forwardBody.max_tokens = 16000;
+                // Effective cap: per-provider DB value → env default → 16000
+                const envDefault = process.env.SOAT_DEFAULT_MAX_TOKENS ? Number(process.env.SOAT_DEFAULT_MAX_TOKENS) : 16000;
+                const effectiveCap = (upstream.max_output_tokens && upstream.max_output_tokens > 0)
+                    ? upstream.max_output_tokens
+                    : envDefault;
+                if (forwardBody.max_tokens && forwardBody.max_tokens > effectiveCap) {
+                    forwardBody.max_tokens = effectiveCap;
+                    const tsCap = new Date().toISOString();
+                    console.log(`[${tsCap}] [TokenCap] max_tokens capped to ${effectiveCap} for provider=${upstream.provider} (db=${upstream.max_output_tokens ?? 'null'}, env=${process.env.SOAT_DEFAULT_MAX_TOKENS ?? 'unset'})`);
                 }
             }
 

@@ -17,7 +17,7 @@ upstreamKeys.get('/health', async (c) => {
 upstreamKeys.get('/', async (c) => {
     const { data, error } = await supabase
         .from('upstream_keys')
-        .select('id, project_id, provider, created_at, api_key, max_context_tokens, projects(name)')
+        .select('id, project_id, provider, created_at, api_key, max_context_tokens, max_output_tokens, projects(name)')
         .order('created_at', { ascending: false });
     if (error) return c.json({ error: error.message }, 500);
 
@@ -89,6 +89,38 @@ upstreamKeys.patch('/:id/context-limit', async (c) => {
 upstreamKeys.post('/reset-all', async (c) => {
     resetAllProvidersStatus();
     return c.json({ success: true });
+});
+
+// PATCH /:id/output-token-limit — set or clear max_output_tokens for this upstream key
+upstreamKeys.patch('/:id/output-token-limit', async (c) => {
+    const { id } = c.req.param();
+    const body = await c.req.json();
+    // Send null to remove the limit entirely
+    const max_output_tokens = body.max_output_tokens === null
+        ? null
+        : (Number(body.max_output_tokens) || null);
+    const { data, error } = await supabase
+        .from('upstream_keys')
+        .update({ max_output_tokens })
+        .eq('id', id)
+        .select('id, provider, max_output_tokens')
+        .single();
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(data);
+});
+
+// PATCH /output-token-limit-all — set or clear max_output_tokens for ALL upstream keys globally
+upstreamKeys.patch('/output-token-limit-all', async (c) => {
+    const body = await c.req.json();
+    const max_output_tokens = body.max_output_tokens === null
+        ? null
+        : (Number(body.max_output_tokens) || null);
+    const { error } = await supabase
+        .from('upstream_keys')
+        .update({ max_output_tokens })
+        .not('id', 'is', null); // update all rows
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json({ success: true, max_output_tokens });
 });
 
 upstreamKeys.post('/:id/reset', async (c) => {
