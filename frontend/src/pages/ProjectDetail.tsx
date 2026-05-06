@@ -605,6 +605,7 @@ export default function ProjectDetail() {
                                     <option value="google">Google</option>
                                     <option value="vertex">Vertex AI (via AI Studio)</option>
                                     <option value="anthropic">Anthropic</option>
+                                    <option value="deepseek">DeepSeek</option>
                                     <option value="kie">Kie (Gemini vía Kie)</option>
                                     <option value="cerebras">Cerebras</option>
                                     <option value="nvidia">NVIDIA NIM</option>
