@@ -388,11 +388,32 @@ upstreamKeys.get('/:id/models', async (c) => {
             });
         }
         else if (keyData.provider === 'deepseek') {
-            // DeepSeek direct API — OpenAI-compatible
+            // Try the live /models endpoint first; fall back to curated list if unavailable
+            try {
+                const dsRes = await fetch('https://api.deepseek.com/models', {
+                    headers: { 'Authorization': `Bearer ${keyData.api_key}` }
+                });
+                if (dsRes.ok) {
+                    const dsData = await dsRes.json();
+                    const models = dsData.data || [];
+                    if (models.length > 0) {
+                        return c.json({ models });
+                    }
+                }
+                console.warn(`[Models] DeepSeek API returned ${dsRes.status} — using curated fallback list`);
+            } catch (fetchErr: any) {
+                console.warn(`[Models] DeepSeek API fetch failed (${fetchErr.message}) — using curated fallback list`);
+            }
+            // Curated fallback — official DeepSeek models (2026)
+            // Source: https://api-docs.deepseek.com/api/list-models
             return c.json({
                 models: [
-                    { id: 'deepseek-chat' },       // DeepSeek-V3
-                    { id: 'deepseek-reasoner' },    // DeepSeek-R1
+                    // ── Current models ──
+                    { id: 'deepseek-v4-flash' },   // non-thinking mode (replaces deepseek-chat)
+                    { id: 'deepseek-v4-pro' },      // advanced reasoning model
+                    // ── Legacy (deprecated 2026-07-24) ──
+                    { id: 'deepseek-chat' },         // alias → deepseek-v4-flash non-thinking
+                    { id: 'deepseek-reasoner' },     // alias → deepseek-v4-flash thinking
                 ]
             });
         }
