@@ -450,7 +450,7 @@ upstreamKeys.post('/:id/test', async (c) => {
             .eq('id', id)
             .single();
 
-        if (error || !keyData) return c.json({ error: 'Key not found' }, 404);
+        if (error || !keyData) return c.json({ status: 404, error: 'Key not found' });
 
         let url = '';
         let headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -501,7 +501,7 @@ upstreamKeys.post('/:id/test', async (c) => {
         } else if (keyData.provider === 'puter') {
             return c.json({ status: 200, data: { status: 'Puter SDK Health OK (Simulated)' } });
         } else {
-            return c.json({ error: 'Unsupported provider for direct test' }, 400);
+            return c.json({ status: 400, error: 'Unsupported provider for direct test' });
         }
 
         const response = await fetch(url, {
@@ -512,13 +512,15 @@ upstreamKeys.post('/:id/test', async (c) => {
 
         const data = await response.json().catch(() => null);
 
+        // Always return HTTP 200 to the frontend so fetchApi never throws.
+        // The actual provider status is embedded in the JSON body.
         if (!response.ok) {
-            return c.json({ status: response.status, error: data || response.statusText }, response.status as any);
+            return c.json({ status: response.status, error: data || response.statusText });
         }
 
         return c.json({ status: response.status, data });
     } catch (err: any) {
-        return c.json({ status: 500, error: err.message }, 500);
+        return c.json({ status: 500, error: err.message });
     }
 });
 
